@@ -1,0 +1,6 @@
+<?
+define("GROUP_AUTHORS_ID", '8');
+define("PUBLISHED_AUTHOR_STATUS_ID", '143');
+define("REVIEWS_IBLOCK_ID", '6');
+define("REVIEWS_IBLOCK_AUTHOR_PROPERTY_ID", '13');
+define("CONTENT_MANAGER_GROUP_ID", '6');

@@ -1,7 +1,7 @@
-bitrix/
+/bitrix/
 company/
 contacts/
-include/
+/include/
 login/
 news/
 products/
@@ -18,3 +18,4 @@ upload/
 favicon.ico
 index.php
 urlrewrite.php
+test.php
