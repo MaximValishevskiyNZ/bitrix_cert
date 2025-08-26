@@ -19,3 +19,4 @@ favicon.ico
 index.php
 urlrewrite.php
 test.php
+/local/log/
