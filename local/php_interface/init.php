@@ -2,8 +2,7 @@
 AddEventHandler("iblock", "OnBeforeIBlockElementAdd", array("MyClass", "OnBeforeIBlockElementAddHandler"));
 AddEventHandler("iblock", "OnBeforeIBlockElementUpdate", array("MyClass", "OnBeforeIBlockElementUpdateHandler"));
 AddEventHandler("iblock", "OnAfterIBlockElementUpdate", array("MyClass", "OnAfterIBlockElementUpdateHandler"));
-AddEventHandler("search", "OnAfterIndexAdd", ["SearchTitleExtender", "OnAfterIndexAdd"]);
-// AddEventHandler("main", "OnPanelCreate", "OnAdminContextMenuShow");
+
 
 CModule::IncludeModule('iblock');
 class MyClass
@@ -90,44 +89,30 @@ function Agent_ex_610()
 }
 
 
-class SearchTitleExtender
+AddEventHandler("search", "BeforeIndex", Array("IndexHandler2", "BeforeIndexHandler"));
+class IndexHandler2
 {
-	public static function OnAfterIndexAdd($searchContentId, &$arFields)
+	public static function BeforeIndexHandler($arFields)
 	{
-		if ($arFields['PARAM2'] != REVIEWS_IBLOCK_ID) {
-			return;
-		}
-
-		$arSelect = ["ID", "IBLOCK_ID", "PROPERTY_AUTHOR", "PROPERTY_AUTHOR_VALUE", "NAME"];
-		$arFilter = ['ID' => $arFields['ITEM_ID']];
-		$resReview = CIBlockElement::GetList([], $arFilter, false, [], $arSelect)->GetNext();
-
-		$usersFilter = ["ID" => $resReview['PROPERTY_AUTHOR_VALUE']];
-		$usersParams = ["SELECT" => ["UF_USER_CLASS"]];
-		$resAuthor = CUser::GetList("ID", 'asc', $usersFilter, $usersParams)->GetNext();
-		$UFName = CUserFieldEnum::GetList(
+		if($arFields["PARAM2"] == REVIEWS_IBLOCK_ID)
+		{
+			$usersFilter = ["ID" => $arFields["ID"]];
+			$usersParams = ["SELECT" => ["UF_USER_CLASS"]];
+			$resAuthor = CUser::GetList("ID", 'asc', $usersFilter, $usersParams)->GetNext()['UF_USER_CLASS'];
+			$UFName = CUserFieldEnum::GetList(
 			[],
-			['ID' => $resAuthor['UF_USER_CLASS'], 'USER_FIELD_ID' => 17]
+			['ID' => $resAuthor, 'USER_FIELD_NAME' => 'UF_USER_CLASS']
 		)->GetNext()['VALUE'];
-
-		$cleanName = preg_replace(
-			'/(\s*\.\s*Класс:\s*[^\.\n]*)$/u',
-			'',
-			$resReview['NAME']
-		);
-		$cleanName = trim($cleanName);
-
-		$newName = $cleanName
-			? $cleanName . '. Класс: ' . $UFName
-			: 'Класс: ' . $UFName;
-
-		$el = new CIBlockElement;
-		$updateRes = $el->Update($resReview['ID'], ['NAME' => $newName], false, false);
+			$arFields['TITLE'] = $arFields['TITLE'] . '. Класс: ' . $UFName; 
+		}
+		return $arFields;
 	}
 }
 
+// AddEventHandler('main', 'OnBuildGlobalMenu', 'OnBuildGlobalMenu');
 
-AddEventHandler('main', 'OnBuildGlobalMenu', 'OnBuildGlobalMenu');
+
+
 
 function OnBuildGlobalMenu(&$aGlobalMenu, &$aModuleMenu)
 {
@@ -175,7 +160,59 @@ function OnBuildGlobalMenu(&$aGlobalMenu, &$aModuleMenu)
 			"url" => "https://test2"
 		];
 	}
-	writeToLog($aModuleMenu);
+}
+
+AddEventHandler("main", "OnBeforeUserUpdate", array("ex600", "OnBeforeUserUpdateHandler"));
+AddEventHandler("main", "OnAfterUserUpdate", array("ex600", "OnAfterUserUpdateHandler"));
+class ex600
+{
+	protected static $userClassOld;
+	public static function OnBeforeUserUpdateHandler(&$arFields)
+	{
+		$usersFilter = ["ID" => $arFields["ID"]];
+		$usersParams = ["SELECT" => ["UF_USER_CLASS"]];
+		$resAuthor = CUser::GetList("ID", 'asc', $usersFilter, $usersParams)->GetNext();
+		self::$userClassOld = $resAuthor['UF_USER_CLASS'];
+	}
+	public static function OnAfterUserUpdateHandler(&$arFields)
+	{
+		if ($arFields["RESULT"]) {
+			if ($arFields['UF_USER_CLASS'] != self::$userClassOld) {
+				$arEventFields = array(
+					"OLD_USER_CLASS"                  => self::$userClassOld,
+					"NEW_USER_CLASS"             => $arFields['UF_USER_CLASS'],
+				);
+				CEvent::Send("EX2_AUTHOR_INFO", 's1', $arEventFields);
+			}
+		}
+	}
+}
+
+AddEventHandler('main', 'OnBeforeEventSend', array("MailEvents", "my_OnBeforeEventSendLogger"));
+AddEventHandler('main', 'OnBeforeEventSend', array("MailEvents", "addToTemplate"));
+class MailEvents
+{
+	public static function my_OnBeforeEventSendLogger($arFields, $arTemplate)
+	{
+
+		writeToLog(['Поля' => $arFields, "Шаблон" => $arTemplate]);
+	}
+
+	public static function addToTemplate(&$arFields, &$arTemplate)
+	{
+
+
+		if ($arTemplate['EVENT_NAME'] == "USER_INFO") {
+			$usersFilter = ["ID" => $arFields["USER_ID"]];
+			$usersParams = ["SELECT" => ["UF_USER_CLASS"]];
+			$userClass = CUser::GetList("ID", 'asc', $usersFilter, $usersParams)->GetNext()['UF_USER_CLASS'];
+			$UFName = CUserFieldEnum::GetList(
+				[],
+				['ID' => $userClass, 'USER_FIELD_NAME' => 'UF_USER_CLASS']
+			)->GetNext()['VALUE'];
+			$arFields['CLASS'] = $UFName;
+		}
+	}
 }
 
 function writeToLog($data, $filename = 'debug')
