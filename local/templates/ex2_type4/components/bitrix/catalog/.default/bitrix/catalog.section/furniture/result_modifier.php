@@ -22,36 +22,46 @@ $firstReview = [];
 //Запрос рецензий
 $arSelect = ["ID", "IBLOCK_ID", "NAME", "PROPERTIES", "PROPERTY_AUTHOR", "PROPERTY_PRODUCT"];
 $arrayProductsIds = array_column($arResult["ITEMS"], "ID");
-$arFilter = ["IBLOCK_CODE" => "reviews", "PROPERTY_PRODUCT" => $arrayProductsIds];
-$req = CIBlockElement::GetList([], $arFilter, false, [], $arSelect);
-$res = [];
-while($ob = $req->GetNext()) {
-		$res[] = $ob;
-	}
 
+// Проверяем, что есть ID товаров
+if (!empty($arrayProductsIds)) {
+    $arFilter = ["IBLOCK_CODE" => "reviews", "PROPERTY_PRODUCT" => $arrayProductsIds];
+    $req = CIBlockElement::GetList([], $arFilter, false, [], $arSelect);
+    $res = [];
+    while($ob = $req->GetNext()) {
+        $res[] = $ob;
+    }
 
-//Фильтрация авторов
-$arrayAuthorIds = implode(' | ', array_unique(array_column($res, "PROPERTY_AUTHOR_VALUE")));
-$usersFilter = ["ID" => $arrayAuthorIds, "GROUPS_ID" => [GROUP_AUTHORS_ID], "UF_AUTHOR_STATUS" => [PUBLISHED_AUTHOR_STATUS_ID]];
-$usersParams = ["FIELDS" => ["ID"]];
-$authorsFiltered = [];
-$req = CUser::GetList("ID", 'asc', $usersFilter, $usersParams);
-while($ob = $req->GetNext()) {
-		$authorsFiltered[] = $ob["ID"];
-	}
+    // Фильтрация авторов
+    $arrayAuthorIds = array_unique(array_column($res, "PROPERTY_AUTHOR_VALUE"));
+    if (!empty($arrayAuthorIds)) {
+        $arrayAuthorIdsStr = implode(' | ', $arrayAuthorIds);
+        $usersFilter = [
+            "ID" => $arrayAuthorIdsStr,
+            "GROUPS_ID" => [GROUP_AUTHORS_ID],
+            "UF_AUTHOR_STATUS" => [PUBLISHED_AUTHOR_STATUS_ID]
+        ];
+        $usersParams = ["FIELDS" => ["ID"]];
+        $authorsFiltered = [];
+        $req = CUser::GetList("ID", 'asc', $usersFilter, $usersParams);
+        while($ob = $req->GetNext()) {
+            $authorsFiltered[] = $ob["ID"];
+        }
 
-//Фильтрация рецензий
-$res = array_filter($res, function($review) use ($authorsFiltered) {
-	return in_array($review["PROPERTY_AUTHOR_VALUE"], $authorsFiltered);
-});
+        // Фильтрация рецензий
+        $res = array_filter($res, function($review) use ($authorsFiltered) {
+            return in_array($review["PROPERTY_AUTHOR_VALUE"], $authorsFiltered);
+        });
 
-foreach ($res as $review) {
-	if ($arResult["ITEMS"][array_search($review["PROPERTY_PRODUCT_VALUE"], $arrayProductsIds)]["REVIEWS"][] = $review) {
-		if (!$count) {
-			$firstReview = $review;
-		}
-		$count++;
-	}
+        foreach ($res as $review) {
+            if ($arResult["ITEMS"][array_search($review["PROPERTY_PRODUCT_VALUE"], $arrayProductsIds)]["REVIEWS"][] = $review) {
+                if (!$count) {
+                    $firstReview = $review;
+                }
+                $count++;
+            }
+        }
+    }
 }
 
 
